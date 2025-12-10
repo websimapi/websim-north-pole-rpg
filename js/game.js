@@ -19,6 +19,7 @@ export class Game {
         this.input = { x: 0, y: 0 };
         this.keys = {};
         this.audioListener = new THREE.AudioListener();
+        this.snowSystem = null;
     }
 
     async init() {
@@ -94,16 +95,42 @@ export class Game {
         this.entities['local'] = this.localPlayer;
     }
 
+    getTerrainHeight(x, z) {
+        // Create rolling snowy hills with festive undulation
+        const scale1 = 0.025;
+        const scale2 = 0.06;
+        const h1 = Math.sin(x * scale1) * Math.cos(z * scale1) * 4;
+        const h2 = Math.cos(x * scale2 + 1.2) * Math.sin(z * scale2 + 2.4) * 2;
+        // Flatten the center slightly for the workshop area
+        const dist = Math.sqrt(x*x + z*z);
+        const flatten = Math.max(0, 1 - dist/30); 
+        
+        return Math.max(-5, h1 + h2) * (1 - flatten*0.5); 
+    }
+
     buildWorld() {
         const loader = new THREE.TextureLoader();       
 
-        // Ground
+        // Ground with Detailed Terrain
         const groundTexture = loader.load('snow_ground.png');
         groundTexture.wrapS = THREE.RepeatWrapping;
         groundTexture.wrapT = THREE.RepeatWrapping;
         groundTexture.repeat.set(16, 16);
         
-        const groundGeo = new THREE.PlaneGeometry(256, 256);
+        // High poly plane for terrain details
+        const groundGeo = new THREE.PlaneGeometry(256, 256, 128, 128);
+        
+        // Apply height map
+        const pos = groundGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i); // Corresponds to World -Z
+            const h = this.getTerrainHeight(x, -y);
+            pos.setZ(i, h);
+        }
+        
+        groundGeo.computeVertexNormals();
+        
         const groundMat = new THREE.MeshStandardMaterial({ 
             map: groundTexture,
             roughness: 0.8,
@@ -114,9 +141,16 @@ export class Game {
         ground.receiveShadow = true;
         this.scene.add(ground);
 
+        // Falling Snow Effect
+        this.createSnow();
+
         // Santa's Workshop
+        const wsX = 0;
+        const wsZ = -20;
+        const wsY = this.getTerrainHeight(wsX, wsZ);
+        
         const workshop = new StaticObject('workshop', 'paper_workshop.png', 12, 10);
-        workshop.mesh.position.set(0, 5, -20);
+        workshop.mesh.position.set(wsX, wsY + 5, wsZ);
         this.scene.add(workshop.mesh);
         this.interactables.push({
             obj: workshop,
@@ -126,8 +160,10 @@ export class Game {
         });       
 
         // Santa NPC
+        const santaX = 0;
+        const santaZ = -12;
         const santa = new NPC('santa_npc', 'paper_santa.png');
-        santa.mesh.position.set(0, 1.5, -12);
+        santa.mesh.position.set(santaX, this.getTerrainHeight(santaX, santaZ) + 1.25, santaZ);
         this.scene.add(santa.mesh);
 
         // Random Trees
@@ -137,10 +173,60 @@ export class Game {
             // Avoid center
             if (Math.abs(x) < 20 && Math.abs(z) < 30) continue;
 
+            const h = this.getTerrainHeight(x, z);
             const tree = new StaticObject(`tree_${i}`, 'paper_tree.png', 4, 6);
-            tree.mesh.position.set(x, 3, z);
+            tree.mesh.position.set(x, h + 3, z);
             this.scene.add(tree.mesh);
         }
+    }
+
+    createSnow() {
+        const particleCount = 2000;
+        const geo = new THREE.BufferGeometry();
+        const positions = [];
+        const velocities = [];
+
+        for (let i = 0; i < particleCount; i++) {
+            positions.push(
+                (Math.random() - 0.5) * 200, // x
+                Math.random() * 50 + 10,     // y
+                (Math.random() - 0.5) * 200  // z
+            );
+            velocities.push(
+                (Math.random() - 0.5) * 0.2, // x drift
+                -Math.random() * 0.2 - 0.1,  // y fall
+                (Math.random() - 0.5) * 0.2  // z drift
+            );
+        }
+
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('velocity', new THREE.Float32BufferAttribute(velocities, 3));
+
+        // Procedural Snow Texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 32, 32);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+
+        const mat = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 0.6,
+            map: texture,
+            transparent: true,
+            opacity: 0.8,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        this.snowSystem = new THREE.Points(geo, mat);
+        this.scene.add(this.snowSystem);
     }
 
     setupInputs() {
@@ -207,6 +293,31 @@ export class Game {
     update() {
         const dt = this.clock.getDelta();
 
+        // Snow Animation
+        if (this.snowSystem) {
+            const positions = this.snowSystem.geometry.attributes.position.array;
+            const velocities = this.snowSystem.geometry.attributes.velocity.array;
+            
+            for (let i = 0; i < positions.length / 3; i++) {
+                // Update Pos
+                positions[i * 3] += velocities[i * 3];     // X
+                positions[i * 3 + 1] += velocities[i * 3 + 1]; // Y
+                positions[i * 3 + 2] += velocities[i * 3 + 2]; // Z
+
+                // Respawn if below ground
+                const x = positions[i * 3];
+                const z = positions[i * 3 + 2];
+                const groundH = this.getTerrainHeight(x, z);
+                
+                if (positions[i * 3 + 1] < groundH) {
+                    positions[i * 3 + 1] = 50; // High up
+                    positions[i * 3] = (Math.random() - 0.5) * 200;
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+                }
+            }
+            this.snowSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
         // Input Processing
         let moveX = 0;
         let moveZ = 0;
@@ -232,6 +343,11 @@ export class Game {
         if (this.localPlayer) {
             this.localPlayer.move(moveX, moveZ, dt);
             
+            // Snap to terrain height
+            const px = this.localPlayer.mesh.position.x;
+            const pz = this.localPlayer.mesh.position.z;
+            this.localPlayer.mesh.position.y = this.getTerrainHeight(px, pz) + 1;
+
             // Camera Follow
             const targetPos = this.localPlayer.mesh.position.clone();
             targetPos.add(new THREE.Vector3(20, 20, 20)); // Offset

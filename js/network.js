@@ -115,6 +115,10 @@ export class Network {
                 if (data.x !== undefined && data.z !== undefined) {
                     peer.mesh.position.x = data.x;
                     peer.mesh.position.z = data.z;
+                    // Snap Y to terrain
+                    if (window.App.game && window.App.game.getTerrainHeight) {
+                        peer.mesh.position.y = window.App.game.getTerrainHeight(data.x, data.z) + 1;
+                    }
                 }
             }
         }
@@ -154,15 +158,22 @@ export class Network {
                     side: THREE.DoubleSide
                 });
                 const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
-                mesh.position.set(data.x, 0.5, data.y);
+                
+                // Snap to terrain
+                let y = 0.5;
+                if (window.App.game && window.App.game.getTerrainHeight) {
+                    y = window.App.game.getTerrainHeight(data.x, data.y) + 0.5;
+                }
+
+                mesh.position.set(data.x, y, data.y);
                 
                 // Add floating animation data
-                mesh.userData = { initialY: 0.5, timeOffset: Math.random() * 100 };
+                mesh.userData = { initialY: y, timeOffset: Math.random() * 100 };
                 
                 // Hook into update loop for float
                 mesh.onBeforeRender = () => {
                     const t = performance.now() / 1000;
-                    mesh.position.y = 0.5 + Math.sin(t * 2 + mesh.userData.timeOffset) * 0.2;
+                    mesh.position.y = mesh.userData.initialY + Math.sin(t * 2 + mesh.userData.timeOffset) * 0.2;
                     mesh.lookAt(window.App.game.camera.position);
                 };
 
