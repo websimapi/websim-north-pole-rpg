@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 // Base class for paper cutout sprites
-class PaperEntity {
+export class PaperEntity {
     constructor(id, texturePath, width = 1, height = 1) {
         this.id = id;
         this.mesh = this.createMesh(texturePath, width, height);
