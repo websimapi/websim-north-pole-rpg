@@ -1,0 +1,140 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #87CEEB; /* Sky blue fallback */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#game-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none; /* Let clicks pass through to game */
+}
+
+#currency-hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    gap: 15px;
+}
+
+.currency {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    color: #d42426;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border: 2px solid #2ecc71;
+}
+
+#quest-log {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: url('https://esm.sh/assets/paper_texture_shim.png'); /* Fallback or procedural */
+    background-color: #fffaf0;
+    padding: 15px;
+    width: 200px;
+    border-radius: 5px;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+    transform: rotate(1deg);
+    border: 1px solid #ddd;
+}
+
+#quest-log h3 {
+    margin: 0 0 5px 0;
+    color: #c0392b;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+#quest-log p {
+    margin: 0;
+    font-size: 13px;
+    color: #333;
+}
+
+#interaction-prompt {
+    position: absolute;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+
+#interaction-prompt.hidden {
+    opacity: 0;
+}
+
+.key-hint {
+    background: #fff;
+    color: #000;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+#joystick-zone {
+    position: absolute;
+    bottom: 50px;
+    left: 50px;
+    width: 150px;
+    height: 150px;
+    z-index: 20;
+    /* Only show on touch devices via JS check, or just keep invisible logic */
+}
+
+#chat-feed {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 300px;
+    max-height: 150px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 5px;
+}
+
+.chat-msg {
+    background: rgba(0,0,0,0.5);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    align-self: flex-start;
+}
